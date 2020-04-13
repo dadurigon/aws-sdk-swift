@@ -450,6 +450,44 @@ class S3Tests: XCTestCase {
             }
         }
     }
+    
+    func testStreamObject() {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer {
+            XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully())
+        }
+        let s3 = S3(
+            accessKeyId: "key",
+            secretAccessKey: "secret",
+            region: .euwest1,
+            endpoint: ProcessInfo.processInfo.environment["S3_ENDPOINT"] ?? "http://localhost:4572",
+            eventLoopGroupProvider: .shared(eventLoopGroup)
+        )
+
+        // create buffer
+        let dataSize = 1024*1024
+        var data = Data(count: dataSize)
+        for i in 0..<dataSize {
+            data[i] = UInt8.random(in:0...255)
+        }
+
+        attempt {
+            let testData = try TestData(#function, client: s3)
+            var byteBufferCollate = ByteBufferAllocator().buffer(capacity: 1024*1024)
+
+            let putRequest = S3.PutObjectRequest(body: .data(data), bucket: testData.bucket, key: "tempfile")
+            _ = try s3.putObject(putRequest).wait()
+            
+            let getRequest = S3.GetObjectRequest(bucket: testData.bucket, key: "tempfile")
+            _ = try s3.getObjectStreaming(getRequest) { byteBuffer, eventLoop in
+                var byteBuffer = byteBuffer
+                byteBufferCollate.writeBuffer(&byteBuffer)
+                return eventLoop.makeSucceededFuture(())
+            }.wait()
+
+            XCTAssertEqual(data, byteBufferCollate.getData(at: 0, length: byteBufferCollate.readableBytes))
+        }
+    }
 
     func testS3VirtualAddressing(_ urlString: String) throws -> String {
         let url = URL(string: urlString)!
@@ -500,6 +538,7 @@ class S3Tests: XCTestCase {
             ("testMetaData", testMetaData),
             ("testMultipleUpload", testMultipleUpload),
             ("testListPaginator", testListPaginator),
+            ("testStreamObject", testStreamObject)
         ]
     }
 }
