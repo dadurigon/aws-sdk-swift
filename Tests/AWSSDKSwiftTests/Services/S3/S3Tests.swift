@@ -12,6 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AsyncHTTPClient
 import Foundation
 import AsyncHTTPClient
 import NIO
@@ -452,16 +453,16 @@ class S3Tests: XCTestCase {
     }
     
     func testStreamObject() {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        let httpClient = HTTPClient(eventLoopGroupProvider: .createNew)
         defer {
-            XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully())
+            XCTAssertNoThrow(try httpClient.syncShutdown())
         }
         let s3 = S3(
             accessKeyId: "key",
             secretAccessKey: "secret",
             region: .euwest1,
             endpoint: ProcessInfo.processInfo.environment["S3_ENDPOINT"] ?? "http://localhost:4572",
-            eventLoopGroupProvider: .shared(eventLoopGroup)
+            httpClientProvider: .shared(httpClient)
         )
 
         // create buffer
@@ -490,16 +491,16 @@ class S3Tests: XCTestCase {
     }
 
     func testSelectObjectContent() {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        let httpClient = HTTPClient(eventLoopGroupProvider: .createNew)
         defer {
-            XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully())
+            XCTAssertNoThrow(try httpClient.syncShutdown())
         }
         let s3 = S3(
             //accessKeyId: "key",
             //secretAccessKey: "secret",
             region: .euwest1,
             //endpoint: ProcessInfo.processInfo.environment["S3_ENDPOINT"] ?? "http://localhost:4572",
-            eventLoopGroupProvider: .shared(eventLoopGroup)
+            httpClientProvider: .shared(httpClient)
         )
 
         let strings = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.".split(separator: " ")
@@ -522,7 +523,7 @@ class S3Tests: XCTestCase {
 
             let expression = "Select * from S3Object"
             let input = S3.InputSerialization(csv: .init(fieldDelimiter: ",", fileHeaderInfo: .use, recordDelimiter: "\n"))
-            let output = S3.OutputSerialization(csv: .init(fieldDelimiter: ",", recordDelimiter: "HELLO\n"))
+            let output = S3.OutputSerialization(csv: .init(fieldDelimiter: ",", recordDelimiter: "\n"))
             let request = S3.SelectObjectContentRequest(
                 bucket: testData.bucket,
                 expression: expression,
